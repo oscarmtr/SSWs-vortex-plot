@@ -3,8 +3,7 @@
 This repository contains the Python scripts and generated interactive Plotly figures to visualize the 3D structure of Sudden Stratospheric Warming (SSW) events.
 
 **Background:**  
-These figures were originally generated during my BSc thesis titled:  
-*"Impact of the Stratospheric Polar Vortex on Temperature and Precipitation in the Northern Hemisphere Climate"*.
+These figures were originally generated as part of my BSc thesis.
 
 ## How it works
 
