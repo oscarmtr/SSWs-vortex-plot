@@ -1,17 +1,4 @@
-"""
-Polar Vortex - Geopotential Height Anomalies (3D Animation)
-Adapted for Python with xarray, numpy, and plotly
 
-This script generates an interactive 3D HTML plot showing the evolution
-of the Polar Vortex (Geopotential Height Anomalies) during a Sudden 
-Stratospheric Warming (SSW) event.
-
-Key Features:
-- Uses xarray for lazy loading of NetCDF files (memory efficient).
-- Vectorized operations with numpy for fast anomaly calculations.
-- Generates an interactive Plotly 3D scatter plot.
-- Outputs a standalone, fully interactive HTML file.
-"""
 
 import numpy as np
 import xarray as xr
@@ -31,8 +18,8 @@ warnings.filterwarnings("ignore")
 # File paths (Update these to point to your local ERA5 NetCDF files)
 # The U file should contain daily zonal wind (u) at 10hPa.
 # The Z file should contain daily geopotential (z) at multiple pressure levels.
-U_NC_FILE  = "path/to/your/era5.u.10hPa.day.nc"
-Z_NC_FILE  = "path/to/your/era5.z.allhPa.day.lev2.nc"
+U_NC_FILE  = "/run/media/oscar/External/era5.u.10hPa.day.1980.2023.nc"
+Z_NC_FILE  = "/run/media/oscar/External/era5.z.allhPa.day.2000-2024.lev2.nc"
 
 # Output HTML file name
 OUTPUT_HTML = "3d.ght.anon.animation.ssw.html"
@@ -82,13 +69,17 @@ u_series.index = pd.to_datetime(u_series.index)
 mask = (u_series.index >= DATE_START) & (u_series.index <= DATE_END)
 u_period = u_series[mask]
 
-# Find the first day with u < 0
-day0_candidates = u_period[u_period < 0]
-if len(day0_candidates) == 0:
-    raise ValueError(f"Could not find u < 0 in the period {DATE_START} - {DATE_END}")
+# Find the first day with u < 0 for at least 10 consecutive days
+day0 = None
+for i in range(len(u_period) - 10):
+    if (u_period.iloc[i:i+10] < 0).all():
+        day0 = u_period.index[i].date()
+        break
 
-day0 = day0_candidates.index[0].date()
-print(f"✓ Day 0 detected: {day0}")
+if day0 is None:
+    raise ValueError(f"Could not find 10 consecutive days with u < 0 in the period {DATE_START} - {DATE_END}")
+
+print(f"✓ Day 0 detected (start of 10-day negative wind): {day0}")
 
 ds_u.close()
 
