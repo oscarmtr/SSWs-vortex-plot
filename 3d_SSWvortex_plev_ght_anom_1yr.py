@@ -18,16 +18,16 @@ warnings.filterwarnings("ignore")
 # File paths (Update these to point to your local ERA5 NetCDF files)
 # The U file should contain daily zonal wind (u) at 10hPa.
 # The Z file should contain daily geopotential (z) at multiple pressure levels.
-U_NC_FILE  = "/run/media/oscar/External/era5.u.10hPa.day.1980.2023.nc"
-Z_NC_FILE  = "/run/media/oscar/External/era5.z.allhPa.day.2000-2024.lev2.nc"
+U_NC_FILE  = "path/to/your/era5.u.10hPa.day.nc"
+Z_NC_FILE  = "path/to/your/era5.z.allhPa.day.lev.nc"
 
 # Output HTML file name
 OUTPUT_HTML = "3d.ght.anon.animation.ssw.html"
 
 # Search period for Day 0 (the event onset date)
 # Day 0 is defined as the first day where zonal wind (U) < 0 at the reference latitude.
-DATE_START = "2018-12-01"
-DATE_END   = "2019-02-28"
+DATE_START = "YYYY-MM-DD"
+DATE_END   = "YYYY-MM-DD"
 
 # Animation window (days relative to Day 0)
 DAYS_BEFORE = 10
@@ -40,7 +40,7 @@ PERCENTIL = 0.8
 LAT_REF = 60.0
 
 # Event title for the plot
-EVENTO = "SSW 2018-2019"
+EVENTO = "SSW YYYY-YYYY"
 
 
 # ============================================================

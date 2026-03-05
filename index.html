@@ -157,11 +157,27 @@
         </ul>
     </main>
 
-    <footer>
-        Generated with Python and Plotly | <a
-            href="https://github.com/oscarmtr/SSWs-vortex-plot/blob/main/3d_SSWvortex_plev_ght_anom_1yr.py"
-            target="_blank">View Source Code</a>
-    </footer>
+    <hr style="margin-top: 3rem; margin-bottom: 1rem; border-color: rgba(255,255,255,0.1);">
+    <div style="text-align: center; font-size: 0.85em; color: gray;">
+        <div style="margin-bottom: 5px;">Created during the BSc thesis "Impact of the Stratospheric Polar Vortex on
+            Temperature and Precipitation in the Northern Hemisphere Climate"</div>
+        <div xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/">
+            <a property="dct:title" rel="cc:attributionURL" href="https://github.com/oscarmtr/SSWs-vortex-plot"
+                style="color: inherit; text-decoration: none;">3D Polar Vortex Plot</a> © <span
+                id="copyrightYear"></span> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName"
+                href="https://sites.google.com/view/oscarmr-en">Óscar Mata-Romero</a>.
+            <br>
+            Content licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/?ref=chooser-v1"
+                target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-NC-SA 4.0</a>.
+            Source code licensed under <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank"
+                style="display:inline-block;">GNU AGPLv3</a>.
+        </div>
+    </div>
+    <script>
+        const copyrightYear = document.getElementById('copyrightYear');
+        if (copyrightYear) { copyrightYear.textContent = new Date().getFullYear(); }
+    </script>
+
 
 </body>
 
