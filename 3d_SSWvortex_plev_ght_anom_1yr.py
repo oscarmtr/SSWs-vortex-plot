@@ -1,13 +1,16 @@
 """
 Polar Vortex - Geopotential Height Anomalies (3D Animation)
-Traducción optimizada de R a Python
+Adapted for Python with xarray, numpy, and plotly
 
-MEJORAS vs script R original:
-- xarray carga el NetCDF lazy (sin cargar todo en RAM)
-- Todas las operaciones vectorizadas con numpy (sin loops)
-- Anomalías calculadas UNA sola vez para todos los frames
-- Coordenadas polares calculadas con broadcasting numpy
-- Tiempo estimado: ~5-15 min vs 1.5h en R
+This script generates an interactive 3D HTML plot showing the evolution
+of the Polar Vortex (Geopotential Height Anomalies) during a Sudden 
+Stratospheric Warming (SSW) event.
+
+Key Features:
+- Uses xarray for lazy loading of NetCDF files (memory efficient).
+- Vectorized operations with numpy for fast anomaly calculations.
+- Generates an interactive Plotly 3D scatter plot.
+- Outputs a standalone, fully interactive HTML file.
 """
 
 import numpy as np
@@ -22,86 +25,90 @@ warnings.filterwarnings("ignore")
 
 
 # ============================================================
-# CONFIGURACIÓN — modifica estos parámetros
+# CONFIGURATION — modify these parameters for your use case
 # ============================================================
 
-# Rutas de archivos
-U_NC_FILE  = "/run/media/oscar/External/era5.u.10hPa.day.1980.2023.nc"
-Z_NC_FILE  = "/run/media/oscar/External/era5.z.allhPa.day.2000-2024.lev2.nc"
-OUTPUT_HTML = "3d.ght.anon.animation.ssw.2018.2019.html"
+# File paths (Update these to point to your local ERA5 NetCDF files)
+# The U file should contain daily zonal wind (u) at 10hPa.
+# The Z file should contain daily geopotential (z) at multiple pressure levels.
+U_NC_FILE  = "path/to/your/era5.u.10hPa.day.nc"
+Z_NC_FILE  = "path/to/your/era5.z.allhPa.day.lev2.nc"
 
-# Período de búsqueda del día 0
+# Output HTML file name
+OUTPUT_HTML = "3d.ght.anon.animation.ssw.html"
+
+# Search period for Day 0 (the event onset date)
+# Day 0 is defined as the first day where zonal wind (U) < 0 at the reference latitude.
 DATE_START = "2018-12-01"
 DATE_END   = "2019-02-28"
 
-# Ventana de animación
+# Animation window (days relative to Day 0)
 DAYS_BEFORE = 10
 DAYS_AFTER  = 20
 
-# Percentil para filtrar anomalías (0.8 = mostrar solo el 20% más extremo)
+# Percentile threshold to filter anomalies (0.8 = show only the 20% most extreme values)
 PERCENTIL = 0.8
 
-# Latitud de referencia para el viento zonal
+# Reference latitude for zonal wind reversal detection (typically 60°N)
 LAT_REF = 60.0
 
-# Título del evento
+# Event title for the plot
 EVENTO = "SSW 2018-2019"
 
 
 # ============================================================
-# PARTE A: Detectar el día 0 (primer día con u < 0 en 60°N)
+# PART A: Detect Day 0 (first day with u < 0 at reference lat)
 # ============================================================
 
-print("Cargando archivo de viento zonal...")
-# xarray carga lazy — no lee todos los datos hasta que se necesitan
+print("Loading zonal wind file...")
+# xarray loads lazily — data is not read into memory until needed
 ds_u = xr.open_dataset(U_NC_FILE)
 
-# Detectar el nombre de la variable de viento (u o uwnd)
+# Detect the name of the wind variable (commonly 'u' or 'uwnd')
 u_var = "u" if "u" in ds_u else list(ds_u.data_vars)[0]
 u_data = ds_u[u_var]
 
-# Seleccionar lat más cercana a 60°N y hacer media zonal (sobre longitud)
-# Todo vectorizado, sin bucles
+# Select latitude closest to reference and calculate zonal mean (over longitude)
 lat_coord = "latitude" if "latitude" in u_data.dims else "lat"
 lon_coord = "longitude" if "longitude" in u_data.dims else "lon"
 time_coord = "time" if "time" in u_data.dims else "valid_time"
 
 u_60 = u_data.sel({lat_coord: LAT_REF}, method="nearest").mean(dim=lon_coord)
 
-# Convertir a pandas para filtrar por período
+# Convert to pandas to easily filter the time period
 u_series = u_60.to_series()
 u_series.index = pd.to_datetime(u_series.index)
 
 mask = (u_series.index >= DATE_START) & (u_series.index <= DATE_END)
 u_period = u_series[mask]
 
-# Primer día con u < 0
+# Find the first day with u < 0
 day0_candidates = u_period[u_period < 0]
 if len(day0_candidates) == 0:
-    raise ValueError(f"No se encontró u < 0 en el período {DATE_START} - {DATE_END}")
+    raise ValueError(f"Could not find u < 0 in the period {DATE_START} - {DATE_END}")
 
 day0 = day0_candidates.index[0].date()
-print(f"✓ Día 0 detectado: {day0}")
+print(f"✓ Day 0 detected: {day0}")
 
 ds_u.close()
 
-# Secuencia de fechas para la animación
+# Generate sequence of dates for the animation
 selected_dates = pd.date_range(
     start=day0 - timedelta(days=DAYS_BEFORE),
     end=day0   + timedelta(days=DAYS_AFTER),
     freq="1D"
 )
-print(f"✓ Fechas seleccionadas: {selected_dates[0].date()} → {selected_dates[-1].date()} ({len(selected_dates)} días)")
+print(f"✓ Selected dates: {selected_dates[0].date()} → {selected_dates[-1].date()} ({len(selected_dates)} days)")
 
 
 # ============================================================
-# PARTE B: Cargar geopotencial y calcular anomalías
+# PART B: Load geopotential and calculate anomalies
 # ============================================================
 
-print("\nCargando archivo de geopotencial (lazy)...")
+print("\nLoading geopotential file (lazy)...")
 ds_z = xr.open_dataset(Z_NC_FILE)
 
-# Detectar nombres de variables/dimensiones
+# Detect variable and dimension names
 z_var   = "z"  if "z"   in ds_z else list(ds_z.data_vars)[0]
 lat_dim = "lat"  if "lat"  in ds_z.dims else "latitude"
 lon_dim = "lon"  if "lon"  in ds_z.dims else "longitude"
@@ -110,7 +117,7 @@ time_dim = "time" if "time" in ds_z.dims else "valid_time"
 
 z_data = ds_z[z_var]
 
-# Convertir presión a hPa si está en Pa
+# Convert pressure to hPa if it is in Pa
 levels_raw = z_data[lev_dim].values
 if levels_raw.max() > 2000:
     levels_hpa = levels_raw / 100.0
@@ -121,76 +128,68 @@ else:
 lats = z_data[lat_dim].values
 lons = z_data[lon_dim].values
 
-# Filtrar hemisferio norte (0-90°N)
+# Filter for Northern Hemisphere (0-90°N)
 z_nh = z_data.sel({lat_dim: slice(90, 0) if lats[0] > lats[-1] else slice(0, 90)})
 lats_nh = z_nh[lat_dim].values
 
-print(f"✓ Resolución: {len(lons)} lon × {len(lats_nh)} lat × {len(levels_hpa)} niveles")
+print(f"✓ Resolution: {len(lons)} lon × {len(lats_nh)} lat × {len(levels_hpa)} levels")
 
-# Convertir a altura geopotencial [m]
-print("Convirtiendo a altura geopotencial...")
+# Convert geopotential to geopotential height [m]
+print("Converting to geopotential height...")
 z_gh = z_nh / 9.80665  # [m²/s²] → [m]
 
-# ── OPTIMIZACIÓN CLAVE 1: Desestacionalizar vectorizado ──────────────────────
-# En R: sweep() + apply() que crea arrays intermedios
-# En Python: xarray hace esto en UNA línea sin copias en memoria
-print("Desestacionalizando (climatología)...")
-z_clim = z_gh.mean(dim=time_dim)          # media temporal por posición
-z_anom = z_gh - z_clim                    # anomalía (broadcast automático)
+# Deseasonalize (calculate climatology)
+# xarray handles the broadcasting automatically in a memory-efficient way
+print("Calculating anomalies (climatology)...")
+z_clim = z_gh.mean(dim=time_dim)          # temporal mean by position
+z_anom = z_gh - z_clim                    # anomaly calculation
 
-# ── OPTIMIZACIÓN CLAVE 2: Ponderación por nivel vectorizada ──────────────────
-# En R: loop for(ll in 1:length(levels)) → O(n_levels) iteraciones
-# En Python: operación vectorizada sobre toda la dimensión a la vez
-print("Aplicando ponderación log10(nivel)...")
+# Apply logarithmic weighting by pressure level
+print("Applying log10(level) weighting...")
 log_weights = xr.DataArray(
     np.log10(levels_hpa + 1),
     coords={lev_dim: z_anom[lev_dim]},
     dims=[lev_dim]
 )
-z_weighted = z_anom * log_weights  # broadcast sobre todas las dimensiones
+z_weighted = z_anom * log_weights
 
-# Seleccionar solo las fechas necesarias para la animación
-print("Seleccionando fechas de la animación...")
+# Select only the dates required for the animation
+print("Selecting animation dates...")
 z_sel = z_weighted.sel({time_dim: selected_dates}, method="nearest")
 
-# Calcular en memoria solo los datos necesarios (31 días × niveles)
-print("Cargando datos seleccionados en RAM...")
-z_sel = z_sel.load()  # solo ~31 días, no todo el dataset 2000-2024
+# Load only the selected dates into RAM (avoids loading the entire dataset)
+print("Loading selected data into RAM...")
+z_sel = z_sel.load()
 ds_z.close()
-print(f"✓ Array cargado: {z_sel.shape} — {z_sel.nbytes / 1e6:.1f} MB")
+print(f"✓ Array loaded: {z_sel.shape} — {z_sel.nbytes / 1e6:.1f} MB")
 
-
-# ── OPTIMIZACIÓN CLAVE 3: Anomalías por nivel en UNA operación ───────────────
-# En R: group_by(Level) %>% mutate() por cada frame → muy lento
-# Aquí: calculamos el percentil global una sola vez
-print("Calculando límites globales de color...")
+# Calculate global color limits based on the loaded data
+print("Calculating global color limits...")
 all_values = z_sel.values.ravel()
 all_values = all_values[~np.isnan(all_values)]
 max_abs = np.ceil(np.percentile(np.abs(all_values), 99) / 500) * 500
 global_min = -max_abs
 global_max =  max_abs
-print(f"✓ Rango de color: [{global_min:.0f}, {global_max:.0f}] m")
+print(f"✓ Color range: [{global_min:.0f}, {global_max:.0f}] m")
 
-
-# ── OPTIMIZACIÓN CLAVE 4: Coordenadas polares vectorizadas ───────────────────
-# En R: mutate(x_polar = ...) por cada fila del dataframe
-# Aquí: broadcasting numpy sobre la rejilla completa
-print("Pre-calculando coordenadas polares...")
+# Pre-calculate polar coordinates for the 3D projection
+print("Pre-calculating polar coordinates...")
 LON_RAD = np.deg2rad(lons)              # (nlon,)
 LAT_NH  = lats_nh                       # (nlat_nh,)
-R       = 90.0 - LAT_NH                 # distancia al polo (°)
+R       = 90.0 - LAT_NH                 # distance to pole (degrees)
 
-# Broadcasting: R shape (nlat,1) × cos/sin shape (1,nlon) → (nlat,nlon)
+# Broadcasting to create a full 2D grid of coordinates
 X_POLAR = R[:, None] * np.cos(LON_RAD[None, :])   # (nlat, nlon)
 Y_POLAR = R[:, None] * np.sin(LON_RAD[None, :])   # (nlat, nlon)
 
 
 # ============================================================
-# PARTE C: Silueta de países en coordenadas polares
+# PART C: Map outlines in polar coordinates
 # ============================================================
 
-print("\nGenerando silueta de países...")
+print("\nGenerating coastline outlines...")
 try:
+    # Try using Cartopy to get accurate coastline shapes
     import cartopy.io.shapereader as shpreader
     from shapely.geometry import MultiLineString
     
@@ -206,20 +205,26 @@ try:
         for coords in coords_list:
             coords = np.array(coords)
             lat_c, lon_c = coords[:, 1], coords[:, 0]
+            
+            # Filter for Northern Hemisphere only
             mask_nh = lat_c >= 0
             if mask_nh.sum() < 2:
                 continue
+                
             lat_c, lon_c = lat_c[mask_nh], lon_c[mask_nh]
+            
+            # Convert to polar coordinates
             r_c = 90.0 - lat_c
             x_c = r_c * np.cos(np.deg2rad(lon_c))
             y_c = r_c * np.sin(np.deg2rad(lon_c))
+            
             x_country.extend(x_c.tolist() + [None])
             y_country.extend(y_c.tolist() + [None])
             z_country.extend([1200.0] * len(x_c) + [None])
 
 except Exception:
-    # Fallback: círculo simple en 60°N
-    print("  (cartopy no disponible, usando círculo de referencia)")
+    # Fallback if Cartopy is not available: draw a simple circle at 60°N
+    print("  (cartopy not available, using reference circle instead)")
     theta = np.linspace(0, 2 * np.pi, 360)
     r_60 = 90 - 60
     x_country = (r_60 * np.cos(theta)).tolist()
@@ -230,11 +235,11 @@ country_trace = go.Scatter3d(
     x=x_country, y=y_country, z=z_country,
     mode="lines",
     line=dict(color="black", width=1.5),
-    name="Costas",
+    name="Coastlines",
     showlegend=False
 )
 
-# Colorscale RdBu invertida (anomalías negativas=azul, positivas=rojo)
+# Colorscale RdBu reversed (negative anomalies = blue, positive = red)
 COLORSCALE = [
     [0.0,  "#053061"], [0.1,  "#2166ac"], [0.2,  "#4393c3"],
     [0.3,  "#92c5de"], [0.4,  "#d1e5f0"], [0.5,  "#f7f7f7"],
@@ -244,49 +249,45 @@ COLORSCALE = [
 
 
 # ============================================================
-# PARTE D: Generar frames de la animación
+# PART D: Generate animation frames
 # ============================================================
 
-print("\nGenerando frames de la animación...")
+print("\nGenerating animation frames...")
 
 def make_frame(date, show_colorbar=False):
-    """Genera un trace 3D para una fecha dada."""
+    """Generates a 3D scatter trace for a given date."""
     diff_days = (date.date() - day0).days
     diff_text = f"+{diff_days}" if diff_days > 0 else str(diff_days)
     
-    # Seleccionar timestep — shape: (nlat_nh, nlon, nlevels)
+    # Select timestep — shape: (nlat_nh, nlon, nlevels)
     z_t = z_sel.sel({time_dim: date}, method="nearest")
     
-    # Transponer a (nlevels, nlat, nlon) para iterar por nivel
-    # z_t.values shape depende del orden de dims en el NetCDF
+    # Transpose to (nlevels, nlat, nlon) to easily iterate by level
     dims = list(z_t.dims)
     lev_ax  = dims.index(lev_dim)
     lat_ax  = dims.index(lat_dim)
     lon_ax  = dims.index(lon_dim)
     
     z_np = np.transpose(z_t.values, axes=[lev_ax, lat_ax, lon_ax])
-    # z_np: (nlevels, nlat_nh, nlon)
     
-    # ── OPTIMIZACIÓN: percentil por nivel de forma vectorizada ───────────────
-    # Calcular anomalía respecto a la media por nivel
+    # Calculate anomaly relative to the mean of each level (vectorized)
     lev_mean = np.nanmean(z_np, axis=(1, 2), keepdims=True)  # (nlev,1,1)
     z_anom_t = z_np - lev_mean                                 # (nlev,nlat,nlon)
     
-    # Calcular percentil por nivel (vectorizado)
+    # Calculate threshold percentile per level (vectorized)
     abs_anom = np.abs(z_anom_t)
     thresholds = np.nanpercentile(abs_anom.reshape(len(levels_hpa), -1),
                                    PERCENTIL * 100, axis=1)   # (nlev,)
     
-    # Máscara: solo puntos que superan el umbral
+    # Mask to keep only the points exceeding the threshold
     mask = abs_anom >= thresholds[:, None, None]  # (nlev,nlat,nlon)
     
-    # Coordenadas X, Y para todos los niveles (broadcasting)
-    # X_POLAR, Y_POLAR: (nlat, nlon) → broadcast con (nlev, nlat, nlon)
+    # Broadcast coordinates to match the 3D shape before masking
     X_all = np.broadcast_to(X_POLAR[None, :, :], z_anom_t.shape)
     Y_all = np.broadcast_to(Y_POLAR[None, :, :], z_anom_t.shape)
     LEV_all = np.broadcast_to(levels_hpa[:, None, None], z_anom_t.shape)
     
-    # Aplicar máscara y aplanar
+    # Apply mask and flatten data for Plotly
     x_pts   = X_all[mask]
     y_pts   = Y_all[mask]
     z_pts   = LEV_all[mask]
@@ -319,11 +320,11 @@ def make_frame(date, show_colorbar=False):
     return trace, diff_text
 
 
-# Frame inicial
+# Create initial frame
 init_trace, init_diff_text = make_frame(selected_dates[0], show_colorbar=True)
 print(f"  Frame 1/{len(selected_dates)} ✓", end="\r")
 
-# Todos los frames
+# Generate all frames
 frames = []
 for i, date in enumerate(selected_dates):
     trace, diff_text = make_frame(date, show_colorbar=True)
@@ -339,16 +340,16 @@ for i, date in enumerate(selected_dates):
     ))
     print(f"  Frame {i+1}/{len(selected_dates)} ✓", end="\r")
 
-print(f"\n✓ {len(frames)} frames generados")
+print(f"\n✓ {len(frames)} frames generated")
 
 
 # ============================================================
-# PARTE E: Construir la figura final
+# PART E: Build final Plotly figure
 # ============================================================
 
-print("\nConstruyendo figura Plotly...")
+print("\nBuilding Plotly figure...")
 
-# Pasos del slider
+# Define slider steps
 slider_steps = [
     dict(
         label=str(d.date()),
@@ -410,7 +411,7 @@ fig = go.Figure(
                     )]
                 ),
                 dict(
-                    label="⏸ Pausa",
+                    label="⏸ Pause",
                     method="animate",
                     args=[[None], dict(
                         frame=dict(duration=0, redraw=False),
@@ -438,19 +439,19 @@ fig = go.Figure(
 
 
 # ============================================================
-# PARTE F: Guardar como HTML optimizado
+# PART F: Save to optimized HTML
 # ============================================================
 
-print(f"\nGuardando HTML en: {OUTPUT_HTML}")
-print("(usando include_plotlyjs='cdn' para reducir tamaño ~3MB vs ~500MB)")
+print(f"\nSaving HTML to: {OUTPUT_HTML}")
+print("(using include_plotlyjs='cdn' to drastically reduce file size)")
 
-# JavaScript para adaptar el gráfico al viewport (pantalla completa)
+# JavaScript to ensure the plot fits the full viewport when opened
 RESIZE_SCRIPT = """
 (function() {
   var gd = document.getElementById('{plot_id}');
   var container = gd.parentElement;
 
-  // CSS para ocupar toda la pantalla
+  // CSS for fullscreen
   document.body.style.margin = '0';
   document.body.style.padding = '0';
   document.body.style.overflow = 'hidden';
@@ -481,8 +482,8 @@ pio.write_html(
 import os
 size_mb = os.path.getsize(OUTPUT_HTML) / 1e6
 print(f"\n{'='*50}")
-print(f"✓ HTML guardado: {size_mb:.1f} MB")
-print(f"✓ Día 0: {day0}")
+print(f"✓ HTML saved: {size_mb:.1f} MB")
+print(f"✓ Day 0: {day0}")
 print(f"✓ Frames: {len(frames)}")
-print(f"✓ Rango de color: [{global_min:.0f}, {global_max:.0f}] m")
+print(f"✓ Color range: [{global_min:.0f}, {global_max:.0f}] m")
 print(f"{'='*50}")
