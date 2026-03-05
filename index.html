@@ -1,1 +1,52 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSW 2018-2019 3D Geopotential Height Anomalies</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #header {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        #header h1 {
+            margin: 0 0 5px 0;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        #header a {
+            color: #0366d6;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        #header a:hover {
+            text-decoration: underline;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>SSW 2018-2019 Polar Vortex 3D Evolution</h1>
+        <a href="https://github.com/oscarmtr/SSWs-vortex-plot/blob/main/3d_SSWvortex_plev_ght_anom_1yr.py" target="_blank">View Python Generator Script</a>
+    </div>
+    <iframe src="3d.ght.anon.animation.ssw.2018.2019.html" title="SSW 2018-2019 3D Plot"></iframe>
+</body>
+</html>
