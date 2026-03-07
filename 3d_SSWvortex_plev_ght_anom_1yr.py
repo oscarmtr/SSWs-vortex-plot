@@ -434,7 +434,6 @@ fig = go.Figure(
 # ============================================================
 
 print(f"\nSaving HTML to: {OUTPUT_HTML}")
-print("(using include_plotlyjs='cdn' to drastically reduce file size)")
 
 # JavaScript to ensure the plot fits the full viewport when opened
 RESIZE_SCRIPT = """
